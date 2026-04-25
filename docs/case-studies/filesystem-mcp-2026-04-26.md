@@ -162,24 +162,26 @@ _No findings._ (Four TEST-003 mutation findings de-escalated to Low; rationale p
 | date | actor | event |
 |---|---|---|
 | 2026-04-26 | auditor | Audit completed against `modelcontextprotocol/servers@HEAD` |
-| 2026-04-26 | auditor | Internal evidence record landed in [yakuphanycl/WinstonRedGuard#307](https://github.com/yakuphanycl/WinstonRedGuard/pull/307) |
+| 2026-04-26 | auditor | Internal evidence record merged: [yakuphanycl/WinstonRedGuard#307](https://github.com/yakuphanycl/WinstonRedGuard/pull/307) |
 | 2026-04-26 | auditor | This case-study published with `disclosure_status: public` (no embargo per SOP §2 Low/Info routing) |
-| _pending_ | auditor | Public upstream PR opened against `modelcontextprotocol/servers` extending `__tests__/structured-content.test.ts` to all 14 tools (covers F-001 through F-005) |
-| _pending_ | auditor | Public upstream PR opened batching F-006 (envelope reconciliation) |
-| _pending_ | auditor | Public upstream PR or issue batching F-007 + F-008 (Info findings) per SOP §2 Info routing |
+| 2026-04-26 | auditor (A) | Upstream PR opened — F-006 envelope cast scope-isolation: [modelcontextprotocol/servers#4045](https://github.com/modelcontextprotocol/servers/pull/4045) (CI green, awaiting maintainer) |
+| 2026-04-26 | auditor (C) | Upstream PR opened — F-001..F-005 `__tests__/structured-content.test.ts` extended 2/14 → 14/14: [modelcontextprotocol/servers#4046](https://github.com/modelcontextprotocol/servers/pull/4046) (CI green, awaiting maintainer) |
+| 2026-04-26 | auditor (B) | Upstream PR opened — F-007 + F-008 batched Info: [modelcontextprotocol/servers#4047](https://github.com/modelcontextprotocol/servers/pull/4047) (CI in progress, awaiting maintainer) |
 
 No private disclosure was performed. No GHSA was filed. No deadlines apply.
+
+> **Audit team**: A, B, C are the three Claude Code agents the auditor coordinated for this wave (operating from the same upstream fork `yakuphanycl/servers`, on file-disjoint branches). Single-author attribution is preserved in commit metadata; the labels here document which agent shipped which finding for traceability.
 
 ---
 
 ## 5. Upstream response
 
-_Pending._ This document is published before any upstream PR has been opened, per SOP §2 Low/Info routing (which permits public-first, no-embargo). Upstream PRs will be opened in the order listed in §4. This section will be updated when responses land.
+All three upstream PRs are filed (see §4 timeline). This section will be updated when maintainer responses land.
 
 **Acknowledgement**: pending
-**Patches landed**: pending
-**Patches declined / wontfix**: pending
-**Outstanding**: F-001 through F-008 (all eight pending upstream contact)
+**Patches landed**: pending — all three PRs CI-green, awaiting maintainer review on `modelcontextprotocol/servers`
+**Patches declined / wontfix**: none yet
+**Outstanding**: F-001..F-008 awaiting maintainer review on PRs [#4045](https://github.com/modelcontextprotocol/servers/pull/4045), [#4046](https://github.com/modelcontextprotocol/servers/pull/4046), [#4047](https://github.com/modelcontextprotocol/servers/pull/4047)
 
 ---
 
