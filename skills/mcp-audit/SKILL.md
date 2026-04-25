@@ -109,6 +109,39 @@ Write the report to one of:
 Both have been used in practice; either is fine. Be consistent with the
 rest of the repo's docs structure.
 
+## TypeScript adaptation
+
+The skill was developed against Python FastMCP (`@mcp.tool()`). When auditing
+a TypeScript MCP server (e.g., `modelcontextprotocol/servers/src/*`), apply
+the following substitutions:
+
+- **Inventory grep**: `server\.registerTool\(` instead of `@mcp.tool()`.
+  Tool names are the first string arg to `registerTool`, not the function
+  name.
+- **Inputs / outputs**: Zod schemas (`inputSchema: { ... }`,
+  `outputSchema: { ... }`), not Python annotations. Read the schema
+  definition, not just the function signature.
+- **Canonical envelope**: TS SDK convention is
+  `{content: [{type, text}], structuredContent: {...}}` — different from
+  FastMCP's `{ok, ...}` Python idiom. The five-axis rubric still applies;
+  the canonical shape per ecosystem differs. Don't force-fit `{ok}` onto
+  a TS surface.
+- **Error handling axis**: TS surface uses `throw` + SDK error channel,
+  not in-band `{ok: false}` envelope. Consistent within surface; flagging
+  as deviation force-fits Python idiom.
+- **MCP-layer test recognition**: integration tests use
+  `@modelcontextprotocol/sdk/client` + `StdioClientTransport` to round-trip
+  through the SDK serializer. This is a higher-fidelity coverage signal
+  than Python's typical "did you call the function" tests. Grep for
+  `@modelcontextprotocol/sdk/client` to identify MCP-layer coverage.
+- **Type-system bypass as inconsistency marker**: grep
+  `as unknown as CallToolResult` and `as any` inside `registerTool` handler
+  bodies — these are the type system's own complaints, captured in source.
+  Map to `SHAPE-005`.
+
+First applied: `modelcontextprotocol/servers@HEAD` filesystem audit
+([case-study](../../docs/case-studies/filesystem-mcp-2026-04-26.md)).
+
 ## Workflow for Claude when this skill triggers
 
 1. Confirm the project uses `@mcp.tool()` (or compatible decorator).
