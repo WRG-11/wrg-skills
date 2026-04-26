@@ -22,10 +22,11 @@ silently applied.
 4. If you need to deviate (rare), record the override and the reason in
    the case-study finding block.
 
-The 12 rows below cover the categories the audit's three checks
-(`schema_drift`, `coverage_floor`, `orphan_modules`) naturally produce,
-plus a small set of cross-cutting hygiene findings that surface during
-audit synthesis.
+The 14 rows below cover the categories the audit's five checks
+(`schema_drift`, `coverage_floor`, `orphan_modules`,
+`required_adapters`, `type_contract_drift`) naturally produce, plus a
+small set of cross-cutting hygiene findings that surface during audit
+synthesis.
 
 Severity bucket definitions are shared with mcp-audit's
 [`docs/disclosure-sop.md` §1](../../docs/disclosure-sop.md#1-severity-rubric).
@@ -53,6 +54,8 @@ into routine cleanup), not **disclosure routing**.
 | 10 | `LAYOUT-001` | Layout / convention | App has neither `src/<pkg>/` nor flat-layout package detectable by skill heuristics | Low | Audit skips the app silently; surfaces a layout convention drift worth standardising | App has only `scripts/` directory, no Python package — likely a misclassified ops folder under `apps/` |
 | 11 | `LAYOUT-002` | Layout / convention | App has `pyproject.toml` but `[project.scripts]` references a module path that doesn't exist | Medium | Install would create a broken CLI entry; surfaces during smoke-install or first run | `[project.scripts] foo = "foo.cli:main"` but `src/foo/cli.py` doesn't exist |
 | 12 | `META-001` | Meta / cross-app | Same finding type appears in ≥50% of audited apps | Info | Suggests a monorepo-level convention is misapplied or a tooling gap; raise as a single cross-cutting follow-up rather than per-app PRs | All 18 apps lack coverage records (COVER-002) — likely the health-dir convention changed |
+| 13 | `ADAPTER-001` | Required adapters | `adapters/__init__.py` declares an adapter name (in `REQUIRED_ADAPTERS` or in module-name-style `__all__`) but no matching `adapters/<name>.py` or `adapters/<name>/__init__.py` exists | Medium | The package's exported contract drifted from the actual module set — typically a re-export typo or a deleted module that the contract list still mentions. Imports of the missing name fail at runtime on first call into the adapter | `apps/research_motor/src/research_motor/adapters/__init__.py` lists `"keybase_v2"` in `REQUIRED_ADAPTERS` but the file was renamed to `keybase_osint.py` and the contract list wasn't updated |
+| 14 | `TYPE-001` | Type contract drift | A class assigned to a typed variable (`x: ProtoName = Cls(...)`) or returned from a factory annotated `-> ProtoName` is missing one or more of the Protocol's declared methods | Medium | The class claims a contract it does not satisfy; mypy may catch this in strict mode but does not in many real-world configs. Calls into the missing method fail at runtime, often after the object has crossed an abstraction boundary that obscures the original cause | `apps/foo/src/foo/impl.py`: `class A` assigned to `x: P = A()` where `P` requires `sync()` and `close()`, but `A` only implements `close()` |
 
 ---
 
@@ -83,7 +86,7 @@ row, propose a new row in the case-study's §6 ("Reusable patterns") and
 open a follow-up PR against this file. Keep `finding_id` zero-padded and
 contiguous within its category prefix.
 
-The 12-row count is not sacred — the table is expected to grow as more
+The 14-row count is not sacred — the table is expected to grow as more
 case-studies land. The constraint is that every finding in every
 case-study cites a row by `finding_id`, so coverage must precede usage.
 
