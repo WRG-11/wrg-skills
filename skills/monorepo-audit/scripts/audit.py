@@ -462,11 +462,334 @@ def check_orphan_modules(apps: list[Path]) -> CheckResult:
 
 
 # ──────────────────────────────────────────────────────────────────────
+# Check 4: required_adapters
+# ──────────────────────────────────────────────────────────────────────
+
+
+def _required_adapter_names(init_path: Path) -> tuple[list[str], str] | None:
+    """Parse __all__ or REQUIRED_ADAPTERS from an adapters/__init__.py.
+
+    Returns (names, source) where source is "REQUIRED_ADAPTERS" or
+    "__all__", or None if neither contract list is present.
+    REQUIRED_ADAPTERS wins when both are declared.
+    """
+    try:
+        tree = ast.parse(init_path.read_text(encoding="utf-8"))
+    except (OSError, SyntaxError):
+        return None
+    found: dict[str, list[str]] = {}
+    for node in tree.body:
+        if not isinstance(node, ast.Assign):
+            continue
+        if not isinstance(node.value, (ast.List, ast.Tuple, ast.Set)):
+            continue
+        names: list[str] = []
+        for elt in node.value.elts:
+            if isinstance(elt, ast.Constant) and isinstance(elt.value, str):
+                names.append(elt.value)
+        if not names:
+            continue
+        for target in node.targets:
+            if isinstance(target, ast.Name) and target.id in (
+                "__all__", "REQUIRED_ADAPTERS"
+            ):
+                found[target.id] = names
+    if "REQUIRED_ADAPTERS" in found:
+        return found["REQUIRED_ADAPTERS"], "REQUIRED_ADAPTERS"
+    if "__all__" in found:
+        return found["__all__"], "__all__"
+    return None
+
+
+def detect_required_adapters(apps: list[Path]) -> CheckResult:
+    """Flag declared adapters that have no matching <name>.py module.
+
+    Pattern: an adapter package's `__init__.py` declares a contract list
+    (`REQUIRED_ADAPTERS = [...]` or `__all__ = [...]`) of adapter names.
+    Each name should resolve to either `<name>.py` or `<name>/__init__.py`
+    under the same `adapters/` directory. A missing file means the
+    declared contract drifted from the implementation — typically a
+    re-export typo or a deleted module that __all__ still mentions.
+
+    Severity: ADAPTER-001 (Medium). REQUIRED_ADAPTERS lists are treated
+    as strict module-name contracts (every name must resolve). Plain
+    `__all__` is treated leniently: it is only flagged when at least one
+    of its names resolves to a module — that's the signal __all__ is
+    being used as a module-name list (not a re-export symbol list).
+    """
+    result = CheckResult(name="required_adapters")
+    for app_path in apps:
+        pkg = _app_package_dir(app_path)
+        if pkg is None:
+            continue
+        adapters_dir = pkg / "adapters"
+        init = adapters_dir / "__init__.py"
+        if not init.is_file():
+            continue
+        parsed = _required_adapter_names(init)
+        if parsed is None:
+            continue
+        names, source = parsed
+        # Lenient mode for plain __all__: skip unless the convention is
+        # clearly module-name-style (≥1 name resolves to a real module).
+        if source == "__all__":
+            any_resolves = any(
+                (adapters_dir / f"{n}.py").is_file()
+                or (adapters_dir / n / "__init__.py").is_file()
+                for n in names
+            )
+            if not any_resolves:
+                result.notes.append(
+                    f"{app_path.name}: adapters/__init__.py __all__ looks like "
+                    f"re-export symbols (no name maps to a module) — skipped"
+                )
+                continue
+        for name in names:
+            mod_file = adapters_dir / f"{name}.py"
+            sub_init = adapters_dir / name / "__init__.py"
+            if mod_file.is_file() or sub_init.is_file():
+                continue
+            result.findings.append(Finding(
+                check="required_adapters", app=app_path.name,
+                detail=(
+                    f"adapters/__init__.py {source} declares '{name}' but "
+                    f"adapters/{name}.py / adapters/{name}/ not found"
+                ),
+            ))
+    return result
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Check 5: type_contract_drift
+# ──────────────────────────────────────────────────────────────────────
+
+
+def _annotation_name(node: ast.AST | None) -> str | None:
+    """Resolve a single-name type annotation: `X` or `pkg.X` → 'X'."""
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        return node.attr
+    return None
+
+
+def _decorator_name(node: ast.AST) -> str | None:
+    """`@runtime_checkable` or `@typing.runtime_checkable` → 'runtime_checkable'."""
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        return node.attr
+    if isinstance(node, ast.Call):
+        return _decorator_name(node.func)
+    return None
+
+
+def _collect_protocols_in_file(py: Path) -> dict[str, dict[str, Any]]:
+    """Return {ProtocolName: {"methods": set[str], "runtime_checkable": bool}}.
+
+    A class counts as a Protocol if any base resolves to the bare name
+    `Protocol` (covers both `class X(Protocol)` and
+    `class Y(Other, Protocol)`). Method set excludes most dunders but
+    keeps protocol-relevant ones (`__enter__`, `__exit__`, `__call__`,
+    `__iter__`, `__aiter__`, `__anext__`).
+    """
+    try:
+        tree = ast.parse(py.read_text(encoding="utf-8"))
+    except (OSError, SyntaxError):
+        return {}
+    keep_dunder = {
+        "__enter__", "__exit__", "__call__", "__iter__",
+        "__aiter__", "__anext__", "__aenter__", "__aexit__",
+        "__getitem__", "__setitem__", "__contains__", "__len__",
+    }
+    protocols: dict[str, dict[str, Any]] = {}
+    for node in tree.body:
+        if not isinstance(node, ast.ClassDef):
+            continue
+        is_protocol = any(
+            _annotation_name(b) == "Protocol" for b in node.bases
+        )
+        if not is_protocol:
+            continue
+        methods: set[str] = set()
+        for child in node.body:
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                if child.name.startswith("__") and child.name not in keep_dunder:
+                    continue
+                methods.add(child.name)
+        runtime_checkable = any(
+            _decorator_name(d) == "runtime_checkable"
+            for d in node.decorator_list
+        )
+        protocols[node.name] = {
+            "methods": methods,
+            "runtime_checkable": runtime_checkable,
+        }
+    return protocols
+
+
+def _has_isinstance_test(tests_dir: Path, proto_name: str) -> bool:
+    """True if any tests/test_*.py calls isinstance(_, proto_name)."""
+    if not tests_dir.is_dir():
+        return False
+    for test_py in tests_dir.rglob("test_*.py"):
+        try:
+            tree = ast.parse(test_py.read_text(encoding="utf-8", errors="ignore"))
+        except (OSError, SyntaxError):
+            continue
+        for sub in ast.walk(tree):
+            if not isinstance(sub, ast.Call):
+                continue
+            fn = sub.func
+            fname = fn.id if isinstance(fn, ast.Name) else (
+                fn.attr if isinstance(fn, ast.Attribute) else None
+            )
+            if fname != "isinstance" or len(sub.args) < 2:
+                continue
+            if _annotation_name(sub.args[1]) == proto_name:
+                return True
+    return False
+
+
+def _called_class_name(node: ast.AST) -> str | None:
+    """For `Foo(...)` or `pkg.Foo(...)` extract 'Foo'; else None."""
+    if not isinstance(node, ast.Call):
+        return None
+    return _annotation_name(node.func)
+
+
+def _find_implementer_classes(
+    pkg: Path, proto_name: str
+) -> set[tuple[Path, str]]:
+    """Find classes claimed to implement `proto_name`.
+
+    Two patterns:
+      1. Typed assignment   `var: ProtoName = SomeClass(...)`
+      2. Factory return     `def f(...) -> ProtoName: return SomeClass(...)`
+
+    Bare name returns (`return SomeClass`) and instance returns of
+    other variables are intentionally skipped — they would require
+    flow-sensitive analysis to resolve cleanly.
+    """
+    out: set[tuple[Path, str]] = set()
+    for py in pkg.rglob("*.py"):
+        try:
+            tree = ast.parse(py.read_text(encoding="utf-8"))
+        except (OSError, SyntaxError):
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, ast.AnnAssign):
+                if _annotation_name(node.annotation) != proto_name:
+                    continue
+                if node.value is None:
+                    continue
+                cls = _called_class_name(node.value)
+                if cls and cls != proto_name:
+                    out.add((py, cls))
+            elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                if _annotation_name(node.returns) != proto_name:
+                    continue
+                for sub in ast.walk(node):
+                    if isinstance(sub, ast.Return) and sub.value is not None:
+                        cls = _called_class_name(sub.value)
+                        if cls and cls != proto_name:
+                            out.add((py, cls))
+    return out
+
+
+def _class_methods(pkg: Path, class_name: str) -> set[str] | None:
+    """Resolve a top-level class definition by name, return method names.
+
+    Searches all .py files in pkg for `class <class_name>` at module
+    scope. Returns None if not found (caller should treat as
+    unresolvable and skip — conservative, no false positives from
+    aliased / dynamic / cross-pkg classes).
+    """
+    for py in pkg.rglob("*.py"):
+        try:
+            tree = ast.parse(py.read_text(encoding="utf-8"))
+        except (OSError, SyntaxError):
+            continue
+        for node in tree.body:
+            if isinstance(node, ast.ClassDef) and node.name == class_name:
+                methods: set[str] = set()
+                for child in node.body:
+                    if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                        methods.add(child.name)
+                return methods
+    return None
+
+
+def detect_type_contract_drift(apps: list[Path]) -> CheckResult:
+    """Flag classes claiming a Protocol but missing one or more methods.
+
+    Scope per app: protocols defined in `<pkg>/**/protocols.py` or
+    `<pkg>/**/*_proto.py`. Implementer claims found via two AST
+    patterns (typed assignment, factory return annotation).
+
+    Skip rule: if a Protocol is decorated `@runtime_checkable` AND any
+    `tests/test_*.py` actually calls `isinstance(_, <Protocol>)`, the
+    runtime check is treated as the contract — static drift is no
+    longer authoritative for that protocol.
+
+    Severity: TYPE-001 (Medium). Findings list the missing method
+    names so the maintainer can either add them or correct the type
+    annotation.
+    """
+    result = CheckResult(name="type_contract_drift")
+    for app_path in apps:
+        pkg = _app_package_dir(app_path)
+        if pkg is None:
+            continue
+        protocols: dict[str, dict[str, Any]] = {}
+        for py in pkg.rglob("*.py"):
+            if py.name == "protocols.py" or py.name.endswith("_proto.py"):
+                protocols.update(_collect_protocols_in_file(py))
+        if not protocols:
+            continue
+        tests_dir = app_path / "tests"
+        for proto_name, meta in protocols.items():
+            required = meta["methods"]
+            if not required:
+                continue
+            if meta["runtime_checkable"] and _has_isinstance_test(
+                tests_dir, proto_name
+            ):
+                result.notes.append(
+                    f"{app_path.name}: {proto_name} runtime-checkable + "
+                    f"isinstance test present — runtime check is the contract"
+                )
+                continue
+            for impl_file, cls in _find_implementer_classes(pkg, proto_name):
+                methods = _class_methods(pkg, cls)
+                if methods is None:
+                    continue
+                missing = required - methods
+                if not missing:
+                    continue
+                rel = impl_file.relative_to(app_path)
+                result.findings.append(Finding(
+                    check="type_contract_drift", app=app_path.name,
+                    detail=(
+                        f"{rel}: class '{cls}' claims '{proto_name}' but "
+                        f"missing methods: {sorted(missing)}"
+                    ),
+                ))
+    return result
+
+
+# ──────────────────────────────────────────────────────────────────────
 # Report assembly
 # ──────────────────────────────────────────────────────────────────────
 
 
-ALL_CHECKS = ("schema_drift", "coverage_floor", "orphan_modules")
+ALL_CHECKS = (
+    "schema_drift",
+    "coverage_floor",
+    "orphan_modules",
+    "required_adapters",
+    "type_contract_drift",
+)
 
 
 def run_audit(
@@ -488,6 +811,10 @@ def run_audit(
             results.append(check_coverage_floor(apps, health_dir))
         elif check == "orphan_modules":
             results.append(check_orphan_modules(apps))
+        elif check == "required_adapters":
+            results.append(detect_required_adapters(apps))
+        elif check == "type_contract_drift":
+            results.append(detect_type_contract_drift(apps))
 
     all_findings: list[Finding] = []
     all_notes: list[str] = []
