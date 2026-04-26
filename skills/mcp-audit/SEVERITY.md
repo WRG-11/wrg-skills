@@ -23,7 +23,7 @@ silently applied.
 4. If you need to deviate (rare), record the override and the reason in
    the case-study finding block.
 
-The 32 rows below cover the categories the audit's six sections naturally
+The 33 rows below cover the categories the audit's six sections naturally
 produce, plus security-adjacent findings that surface when the audit is
 applied to an *external* server (where the auditor has no prior trust
 context with the maintainer).
@@ -66,6 +66,7 @@ context with the maintainer).
 | 30 | `SEC-007` | Security | SQL or NoSQL injection in tool args | High | Data exfiltration or corruption; conditional on backend | Tool builds `f"SELECT * FROM users WHERE id={uid}"` |
 | 31 | `SEC-008` | Security | Missing rate limit on resource-heavy tool (large fetch, expensive compute) | Medium | DoS vector; not direct compromise | Tool runs full repo scan on every call with no throttle |
 | 32 | `SEC-009` | Security | Verbose error leaks system info (versions, paths, internal hostnames) | Medium | Reconnaissance aid; lower than ERR-003 because not exception-driven | Tool returns `{"server_version": "...", "host": "...", "data_dir": "..."}` on every call |
+| 33 | `SHAPE-005` | Return-shape | Tool handler return cast (`as unknown as CallToolResult` in TS, `cast()` in Python) bypassing `outputSchema` typecheck | Low | Type system flagged a real shape mismatch and the handler bypassed it instead of fixing the return — strong corroboration signal for SHAPE-001 deviations and concrete evidence beats schema-in-isolation review | `read_media_file` returns `structuredContent.content: [{type, data, mimeType}, ...]` while `outputSchema` declares the field as `z.string()`; mismatch silenced via `return result as unknown as CallToolResult` at the handler boundary |
 
 ---
 
@@ -95,6 +96,6 @@ row, propose a new row in the case-study's §6 ("Reusable patterns") and
 open a follow-up PR against this file. Keep `finding_id` zero-padded and
 contiguous within its category prefix.
 
-The 32-row count is not sacred — the table is expected to grow as more
+The 33-row count is not sacred — the table is expected to grow as more
 external audits land. The constraint is that every finding in every
 case-study cites a row by `finding_id`, so coverage must precede usage.
