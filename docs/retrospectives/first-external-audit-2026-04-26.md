@@ -258,14 +258,112 @@ Threshold: 1-9 tools = lite scan. 10+ tools = full 5-axis scan.
 
 **Attribution**: surfaced by C's `mcp-server-fetch` audit (wave 2). The disclosure SOP gate worked exactly as designed — the claim was caught at A's pre-disclosure review. Codifying the verification step into the skill prevents the same shape of error in future audits.
 
-### 6.7 No skill-source PRs from A this wave
+### 6.7 `SKILL.md` — add 6th axis: stateful surface adaptation
 
-`SKILL.md` and `SEVERITY.md` are currently being modified by B's #8 (TS-adaptation subsection + SHAPE-005 row). To avoid file-conflict with B's open PR, A's retro lands as a standalone document under `docs/retrospectives/` and the actions above are filed as **proposals**, not source edits. Once #8 merges, any of §6.1–§6.4 can be opened as one or more follow-up PRs. The order doesn't matter — these are independent.
+**Where**: `skills/mcp-audit/SKILL.md`, "What this skill does" section, after the existing 5 axes.
+
+**Background**: wave 3's B audit of `@modelcontextprotocol/server-memory` (file-backed JSONL storage) was the skill's first audit against a **stateful** surface. The existing 5 axes (discoverability, return-shape, naming, test coverage, decay) all pass cleanly without inspecting the state-handling layer. B's audit surfaced finding F-002 (saveGraph non-atomic + missing in-process serialiser) — which scores trivially-OK on all 5 axes but is genuinely a coverage gap. The proposed 6th axis fills this.
+
+**Content** (proposed):
+
+```markdown
+6. **State handling (stateful surfaces only)** — applies when the server
+   maintains state across tool calls (file-backed store, SQLite, in-memory
+   dict, external service connection):
+   - **Atomicity**: do mutating writes use atomic primitives (write-temp +
+     `fs.rename`, transactions) or naked `write` calls that can leave
+     half-written state on crash?
+   - **Concurrency**: is there an in-process serialiser (mutex, async-lock)
+     for `load → mutate → save` patterns? Two concurrent calls to a
+     mutation tool — does one win cleanly or do they interleave?
+   - **Persistence verification**: do tests verify state survives a process
+     restart, or only that mutations are visible within the same fixture?
+   - **State leakage**: can tool A's mutations be observed by tool B in
+     ways the surface doesn't document? Especially relevant for
+     multi-tenant or multi-context deployments.
+
+   For pure-functional surfaces (no state — `time`, `fetch`, etc.) skip
+   this axis entirely. For stateful surfaces, the four sub-checks above
+   are the discovery questions; map findings to `STATE-*` rows in
+   `SEVERITY.md` (see §6.8).
+```
+
+**Attribution**: surfaced by B's `mcp-server-memory` audit (wave 3, [yakuphanycl/wrg-skills#15](https://github.com/yakuphanycl/wrg-skills/pull/15)). The audit was the first to formally exercise this dimension; B's case-study §6 documents the four sub-checks as candidate skill additions.
+
+### 6.8 `SEVERITY.md` — add 4 new `STATE-*` rows
+
+**Where**: `skills/mcp-audit/SEVERITY.md`, matrix block, after the existing 32 rows (numbered 33–36, contiguous within the new `STATE-*` prefix).
+
+**Background**: §6.7's 6th axis produces findings that don't map cleanly to existing rows. B's F-002 (non-atomic write) was forced into `SHAPE-004` (silent empty return) by analogy — close but not exact. Native rows give the audit honest, attributable severity assignments.
+
+**Content** (proposed, four rows):
+
+```markdown
+| 33 | `STATE-001` | State handling | Mutating tool writes state without atomic primitives (no write-temp + rename, no transaction) | Medium | Crash mid-write leaves half-written state on disk; torn reads possible | `saveGraph` in `mcp-server-memory@0.6.x` writes JSONL via direct `fs.writeFile`, not `fs.rename`-from-temp |
+| 34 | `STATE-002` | State handling | Missing in-process serialiser for `load → mutate → save` pattern across concurrent tool calls | Medium | Two parallel mutation calls can interleave; second's load races first's save = lost write | Two concurrent `create_entities` calls on `mcp-server-memory` can lose one write under load |
+| 35 | `STATE-003` | State handling | State persistence not exercised by tests (mutations visible in fixture, but no restart verification) | Low | Refactor to a different storage backend may silently break persistence; failure surfaces only in production | All `mcp-server-memory` tests are within-fixture; no test re-instantiates the server and checks state |
+| 36 | `STATE-004` | State handling | Tool A's mutations observable by tool B in ways the surface doesn't document (state leakage) | Medium | Multi-tenant deployments leak data across contexts; not directly exploitable but trust-degrading | Hypothetical; not yet observed in audited surfaces — placeholder for future findings |
+```
+
+**Override conventions**: `STATE-001` and `STATE-002` may de-escalate to Low under the §6.3 "Medium-as-patch" edge case (`disclosure-sop.md`) when the fix is a small public PR (e.g., B's #4049 atomic-write fix landed as Low routing). `STATE-004` is Medium by default but escalates to High if the leakage crosses authentication boundaries.
+
+**Attribution**: surfaced by B's `mcp-server-memory` audit (wave 3). The four rows codify B's case-study §6 reusable-pattern proposals.
+
+### 6.9 `SKILL.md` — add pickaxe-as-prerequisite for novel findings
+
+**Where**: `skills/mcp-audit/SKILL.md`, "How to run" section, between current step 1 (Inventory) and step 2 (Discoverability scoring).
+
+**Background**: §6.6 codifies pickaxe verification for "silently removed" claims (reactive, post-claim). §6.9 codifies pickaxe verification as a **prerequisite** for any finding that the audit calls "novel" or "not previously discussed by the maintainer" (proactive, pre-claim). B's wave-3 memory audit applied this proactively before claiming F-002 was novel: 5 `gh search` queries (race / atomic / lock / concurrent / mutex) all returned 0 results, documented in case-study §7 disclosure timeline. This turned the "novel" claim from an assertion into a verified observation.
+
+**Content** (proposed):
+
+```markdown
+1.5. **Novelty verification (prerequisite for any "novel finding" claim)** —
+     before recording a finding as not-previously-discussed by the
+     maintainer, run **at least three** of the following queries:
+     - `gh issue list --repo <upstream> --state all --search "<keyword>"`
+       for the finding's primary keyword(s).
+     - `gh pr list --repo <upstream> --state all --search "<keyword>"`
+       same keywords across PRs.
+     - `gh search code --repo <upstream> "<symbol>"` for a function or
+       symbol the finding names.
+     - `git log -S "<symbol>" -- <path>` (pickaxe) for symbol add/remove
+       history in source.
+     - `git log --all --grep="<keyword>"` for commit-message matches.
+
+     Document the queries run + result counts in the case-study §7
+     disclosure timeline. If a relevant existing issue/PR is found, the
+     finding routes via the §2 SOP "maintainer-tracked, documented
+     limitation" edge case (de-escalate to Low + comment on existing
+     issue), not as a novel finding. If all queries return 0 relevant
+     results, the "novel" claim is verified and the finding routes per
+     its severity bucket.
+```
+
+**Attribution**: surfaced proactively by B's `mcp-server-memory` audit (wave 3) — B applied this pattern without prior codification, then flagged it in case-study §6 as a SKILL.md candidate. Wave 2's C false-positive (`mcp-server-fetch` SSRF, ec20ee7 misattribution) was the negative-example precedent that motivated the proactive form. Together §6.6 (reactive) + §6.9 (proactive) close the attribution-discipline class.
+
+### 6.10 Status update — A's queue cleared post-#8
+
+[`#8` merged 2026-04-26](https://github.com/yakuphanycl/wrg-skills/pull/8) (TS-adaptation subsection + `SHAPE-005` row). A's queue (§6.1, §6.2, §6.5, §6.6, §6.7, §6.8, §6.9) is now unblocked — these can land as a single batched skill PR or 7 separate PRs. §6.3 + §6.4 (file-disjoint from #8) already shipped via [#13](https://github.com/yakuphanycl/wrg-skills/pull/13).
 
 ## 7. The bottom line
 
-The skill works. The infrastructure (template + SOP + SEVERITY) works. The 3-agent topology works. The shared-fork pattern works. The override convention works. The dual-output flow works. The non-repo staging path works.
+After three waves (1 day each, 22 PRs total, 5 audit case studies, 3 ecosystems, 0 scope violations):
 
-The lessons in §3 are real but small — none of them blocked the wave, and all four have proposed fixes in §6. The next external audit (B's git + C's fetch, in flight as of this retro) is the validation of all of the above in a different ecosystem.
+The skill works. The infrastructure (template + SOP + SEVERITY) works. The 3-agent topology works. The shared-fork pattern works. The override convention works (3 distinct override types live-applied). The dual-output flow works. The non-repo staging path works. The disclosure-SOP GHSA gate works (caught a false-positive pre-disclosure). The lite-scan variant works (validated by C's `mcp-server-time` audit at 60% time saving with zero loss of actionable findings). The pickaxe discipline works (applied reactively in wave 2, proactively in wave 3 — B's 5-query proactive scan before claiming novelty).
 
-If wave 2 ships at the same shape (≤24h, ≥6 PRs, 0 scope violations), the framework graduates from "first time worked" to "the way we do this now."
+Wave 2 graduated the framework from "first time worked" to "the way we do this now." Wave 3 graduated it again from "validated on TS + Python FastMCP" to "validated across 3 ecosystems with one stateful surface and one lite-scan."
+
+The next decision — whether to keep auditing or to consolidate momentum into framework refinement and onboarding artifacts — is a strategic call for the maintainer (yakuphanycl), not a methodological gap in the skill.
+
+## 8. Five-audit cross-link table (for quick navigation)
+
+| # | Target | Date | Variant | Severity (C/H/M/L/I) | WRG evidence | wrg-skills case-study | Upstream PR(s) | Comment |
+|---|---|---|---|---|---|---|---|---|
+| 1 | `@modelcontextprotocol/server-filesystem@0.6.3` (TS) | 2026-04-26 | full | 0/0/0/6/2 | [#307](https://github.com/yakuphanycl/WinstonRedGuard/pull/307) | [#9](https://github.com/yakuphanycl/wrg-skills/pull/9) | [#4045](https://github.com/modelcontextprotocol/servers/pull/4045) + [#4046](https://github.com/modelcontextprotocol/servers/pull/4046) + [#4047](https://github.com/modelcontextprotocol/servers/pull/4047) | – |
+| 2 | `@modelcontextprotocol/server-fetch@0.6.3` (FastMCP-Py) | 2026-04-26 | lite (false-positive rescued) | 0/0/0/2/2 | [#308](https://github.com/yakuphanycl/WinstonRedGuard/pull/308) | [#11](https://github.com/yakuphanycl/wrg-skills/pull/11) | – | [issue #2317](https://github.com/modelcontextprotocol/servers/issues/2317#issuecomment-4320872444) |
+| 3 | `@modelcontextprotocol/server-git@2025.x` (low-level Py) | 2026-04-26 | full | 0/0/0/2/1 | [#309](https://github.com/yakuphanycl/WinstonRedGuard/pull/309) | [#12](https://github.com/yakuphanycl/wrg-skills/pull/12) | [#4048](https://github.com/modelcontextprotocol/servers/pull/4048) | – |
+| 4 | `@modelcontextprotocol/server-memory@0.6.x` (TS) | 2026-04-26 | full + stateful axis | 0/0/0/2/1 | [#311](https://github.com/yakuphanycl/WinstonRedGuard/pull/311) | [#15](https://github.com/yakuphanycl/wrg-skills/pull/15) | [#4049](https://github.com/modelcontextprotocol/servers/pull/4049) | – |
+| 5 | `@modelcontextprotocol/server-time@0.6.2` (FastMCP-Py) | 2026-04-26 | **lite** (§6.5 dogfood) | 0/0/0/1/0 | [#310](https://github.com/yakuphanycl/WinstonRedGuard/pull/310) | [#14](https://github.com/yakuphanycl/wrg-skills/pull/14) | – (test gap too narrow) | – |
+
+**Aggregates across 5 audits**: 0 Critical / 0 High / 0 Medium / **13 Low / 6 Info** (after overrides). 4 upstream fix PRs filed. 1 issue-comment routing. 0 GHSAs filed (and 1 false-positive rescue confirms the gate works).
