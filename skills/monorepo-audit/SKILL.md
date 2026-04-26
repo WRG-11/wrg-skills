@@ -1,18 +1,18 @@
 ---
 name: monorepo-audit
-description: Audit a Python monorepo for schema drift between SQLite code/DBs, coverage-floor drift between pyproject fail_under and recorded coverage, and orphan Python modules never imported anywhere. Use this skill whenever the user mentions governance checks, schema drift, coverage floor, orphan modules, dead code detection in a monorepo, app/package audit, "is this module used?", fail_under vs actual coverage mismatch, or any phrase like "audit my repo", "check my monorepo", or "/monorepo-audit". Also use when you see a user working in a repo with multiple `apps/<name>/` or `packages/<name>/` subprojects and they're thinking about hygiene, dead code, or consistency across apps — even if they don't specifically ask for an "audit". The output is a human-readable markdown report plus structured JSON, and the skill is fast (no network, stdlib + optional tomli fallback, walks the repo and finishes in seconds).
+description: Audit a Python monorepo for schema drift between SQLite code/DBs, coverage-floor drift between pyproject fail_under and recorded coverage, orphan Python modules never imported anywhere, declared-adapter contracts that drifted from the actual module set, and Protocol type-contracts where the claimed implementer is missing methods. Use this skill whenever the user mentions governance checks, schema drift, coverage floor, orphan modules, dead code detection in a monorepo, adapter contracts / `REQUIRED_ADAPTERS`, Protocol contract drift, app/package audit, "is this module used?", fail_under vs actual coverage mismatch, or any phrase like "audit my repo", "check my monorepo", or "/monorepo-audit". Also use when you see a user working in a repo with multiple `apps/<name>/` or `packages/<name>/` subprojects and they're thinking about hygiene, dead code, or consistency across apps — even if they don't specifically ask for an "audit". The output is a human-readable markdown report plus structured JSON, and the skill is fast (no network, stdlib + optional tomli fallback, walks the repo and finishes in seconds).
 ---
 
 # monorepo-audit
 
 ## What this skill does
 
-Runs three static checks across a Python monorepo and reports findings in a
+Runs five static checks across a Python monorepo and reports findings in a
 single report. Works on any repo where subprojects live under `apps/<name>/`,
 `packages/<name>/`, or a configurable layout. No network calls, no mutation —
 pure read-and-report.
 
-The three checks:
+The five checks:
 
 1. **Schema drift** — parses `CREATE TABLE` statements out of app source code,
    builds the expected column set, compares against live on-disk SQLite DBs
@@ -27,12 +27,32 @@ The three checks:
    builds an AST-based import graph, flags `.py` files that no sibling
    imports. Entrypoints (`__init__.py`, `__main__.py`, `main.py`, and
    targets of `[project.scripts]`) are exempt.
+4. **Required adapters** — for any app with an `adapters/` subpackage,
+   parses `adapters/__init__.py` for a `REQUIRED_ADAPTERS = [...]` list (or
+   a module-name-style `__all__`). Flags any name in the list that has no
+   matching `adapters/<name>.py` or `adapters/<name>/__init__.py`. Plain
+   `__all__` is treated leniently: it only counts as a module-name list
+   when at least one of its entries resolves to a real module — otherwise
+   the audit assumes `__all__` is a re-export symbol list and skips the
+   app with a note.
+5. **Type contract drift** — for Protocol classes defined in
+   `<pkg>/**/protocols.py` or `<pkg>/**/*_proto.py`, finds classes that
+   claim to implement them via two AST patterns:
+   - typed assignment: `var: ProtoName = SomeClass(...)`
+   - factory return:   `def f(...) -> ProtoName: return SomeClass(...)`
+   Flags any implementer that is missing one or more of the Protocol's
+   declared methods. AST-only — no runtime import. Skips a Protocol when
+   it's `@runtime_checkable` AND at least one `tests/test_*.py` calls
+   `isinstance(_, ProtoName)` — in that case the runtime check is treated
+   as the contract.
 
 ## When to use
 
 Strongly trigger on any of:
 - "audit my monorepo" / "audit this repo" / "governance check"
 - "schema drift" / "coverage floor" / "fail_under" / "orphan modules"
+- "required adapters" / "REQUIRED_ADAPTERS drift" / "adapter contract"
+- "type contract drift" / "Protocol drift" / "missing protocol methods"
 - "is this module used?" / "dead code in my repo"
 - "/monorepo-audit" (explicit slash)
 - User in a repo with `apps/*/pyproject.toml` asking about hygiene/cleanup
@@ -61,7 +81,7 @@ Exit code:
 Flags:
 - `--json` — emit JSON instead of markdown
 - `--apps-dir DIR` — which directory contains the subprojects (default: `apps`; common alternatives: `packages`, `projects`)
-- `--only CHECK` — run only one check (schema_drift / coverage_floor / orphan_modules)
+- `--only CHECK` — run only one check (schema_drift / coverage_floor / orphan_modules / required_adapters / type_contract_drift)
 - `--skip CHECK` — skip one check (can be passed multiple times)
 - `--health-dir DIR` — where release/coverage JSONs live (default: `artifacts/health`)
 
@@ -83,6 +103,14 @@ Flags:
    - Orphan modules: may be (a) genuinely dead code → delete, (b) exempt
      entrypoint the graph missed → add to exemption list, or (c) imported
      dynamically → flag for human review.
+   - Required adapters: contract list mentions a name with no module —
+     either rename the contract entry, restore the missing module, or
+     drop the name from `REQUIRED_ADAPTERS` / `__all__` if the adapter
+     was intentionally retired.
+   - Type contract drift: implementer is missing methods declared by the
+     Protocol — either add the method to the class, change the type
+     annotation to the narrower contract the class actually satisfies,
+     or split the Protocol if multiple shapes are now needed.
 5. **Ask before mutating.** The skill is read-only by design. If the user
    wants a fix applied, generate the edit and confirm before writing.
 
@@ -102,6 +130,17 @@ how to configure non-standard monorepos.
   installed, otherwise skips pyproject-based checks with a note.
 - **Non-Python monorepos:** Unsupported. Skill requires `pyproject.toml`
   per-app to meaningfully check coverage.
+- **`required_adapters` triggers only on `adapters/` subpackages** with a
+  contract list. Apps that use a different convention (e.g.,
+  `connectors/`, `plugins/`) won't be checked. The detector is
+  intentionally narrow — adapter packages are where the re-export-vs-
+  module-name drift surfaces in practice.
+- **`type_contract_drift` resolves implementer classes by AST only.** It
+  matches `var: ProtoName = SomeClass(...)` and `def f() -> ProtoName:
+  return SomeClass(...)` patterns. Bare-name returns (`return
+  some_instance`) and cross-package class references are conservatively
+  skipped — rather than guessing, the audit produces no finding for
+  those cases.
 
 ## Report format
 
