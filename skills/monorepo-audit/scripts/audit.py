@@ -199,6 +199,30 @@ def _guess_db_path(app_name: str, app_path: Path, home: Path) -> Path | None:
     return None
 
 
+def _is_empty_db(db_path: Path) -> bool:
+    """True if the SQLite file exists but contains no user tables.
+
+    A common false-positive source: an app calls `sqlite3.connect(path)`
+    on first import, which creates an empty file even if nothing is
+    written. Until the first migration runs, `sqlite_master` is empty
+    and every CREATE TABLE in source looks like "missing in DB" drift.
+    Treat this the same as "no DB found" — skip with a note.
+
+    First documented: 2026-04-26 monorepo-audit run on WRG, where
+    pulseboard.db (DORMANT app) produced 8 false-positive schema_drift
+    findings.
+    """
+    try:
+        with sqlite3.connect(f"file:{db_path}?mode=ro", uri=True) as conn:
+            row = conn.execute(
+                "SELECT count(*) FROM sqlite_master "
+                "WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+            ).fetchone()
+            return (row[0] if row else 0) == 0
+    except sqlite3.Error:
+        return False
+
+
 def check_schema_drift(apps: list[Path], home: Path) -> CheckResult:
     result = CheckResult(name="schema_drift")
     for app_path in apps:
@@ -217,6 +241,12 @@ def check_schema_drift(apps: list[Path], home: Path) -> CheckResult:
         if db_path is None:
             result.notes.append(
                 f"{app_name}: skipped, no live DB found at common paths"
+            )
+            continue
+        if _is_empty_db(db_path):
+            result.notes.append(
+                f"{app_name}: skipped, DB exists at {db_path.name} but contains "
+                f"zero user tables (likely created on import, never migrated)"
             )
             continue
         try:
@@ -359,6 +389,15 @@ def check_coverage_floor(apps: list[Path], health_dir: Path) -> CheckResult:
 
 _EXEMPT_FILENAMES = {"__init__.py", "__main__.py", "main.py"}
 
+# §6.2: ASGI app frameworks whose `app = Framework(...)` at module top
+# marks the file as an entrypoint loaded externally (uvicorn, hypercorn).
+_ASGI_FRAMEWORK_NAMES = {"FastAPI", "Starlette", "Flask", "Quart", "Sanic"}
+
+# §6.1: dynamic-dispatch markers — call patterns that load sibling modules
+# at runtime via reflection rather than static import. Files in directories
+# containing these patterns are dispatched, not orphaned.
+_DYNAMIC_DISPATCH_MARKERS = ("pkgutil.iter_modules", "importlib.import_module")
+
 
 def _script_targets(pyproject: Path) -> set[str]:
     """Dotted module paths that back `[project.scripts]` entries."""
@@ -413,6 +452,150 @@ def _imports_from_file(py: Path) -> set[str]:
     return imports
 
 
+def _is_asgi_entrypoint(py: Path) -> bool:
+    """§6.2: True if the file declares `app = <ASGI framework>(...)` at module top.
+
+    Catches uvicorn-/hypercorn-mounted ASGI apps that have no static
+    importers (the runtime loads them via the `module:variable` string).
+    """
+    try:
+        tree = ast.parse(py.read_text(encoding="utf-8"))
+    except (OSError, SyntaxError):
+        return False
+    for node in tree.body:
+        if not isinstance(node, ast.Assign):
+            continue
+        if not any(
+            isinstance(t, ast.Name) and t.id == "app" for t in node.targets
+        ):
+            continue
+        if isinstance(node.value, ast.Call):
+            fn = node.value.func
+            name = fn.id if isinstance(fn, ast.Name) else (
+                fn.attr if isinstance(fn, ast.Attribute) else None
+            )
+            if name in _ASGI_FRAMEWORK_NAMES:
+                return True
+    return False
+
+
+def _is_plugin_entrypoint(py: Path) -> bool:
+    """§6.2: True if filename is `plugin.py` AND module-level marker present.
+
+    Pluggable monorepo convention (e.g., Control Center HTTP-mount
+    discovery): each app drops a `plugin.py` that the host loads via a
+    discovery mechanism. No static importer in source.
+
+    Marker = either docstring containing 'plugin' / 'entrypoint', or a
+    top-level dunder like `__plugin__ = True` / `PLUGIN = ...`.
+    """
+    if py.name != "plugin.py":
+        return False
+    try:
+        tree = ast.parse(py.read_text(encoding="utf-8"))
+    except (OSError, SyntaxError):
+        return False
+    docstring = ast.get_docstring(tree) or ""
+    if any(k in docstring.lower() for k in ("plugin", "entrypoint", "entry point")):
+        return True
+    for node in tree.body:
+        if isinstance(node, ast.Assign):
+            for t in node.targets:
+                if isinstance(t, ast.Name) and (
+                    t.id.startswith("__plugin")
+                    or t.id == "PLUGIN"
+                    or t.id == "PLUGINS"
+                ):
+                    return True
+    return False
+
+
+def _is_dynamic_dispatch_dir(directory: Path) -> bool:
+    """§6.1: True if a same-level sibling uses dispatch markers.
+
+    The canonical pattern: a parent module sits next to a submodule
+    directory and does `pkgutil.iter_modules(<dir>.__path__)` +
+    `importlib.import_module(...)` to load every submodule of <dir> by
+    name. Submodules in <dir> are loaded at runtime, not via static
+    `import`, so they appear as orphans without this check.
+
+    "Same-level sibling" = a `.py` file directly in `directory.parent`,
+    OR `directory/__init__.py`, OR a registry/loader file in the
+    sibling tree at depth ≤2. We deliberately bound the search radius
+    so a project-wide dispatcher (e.g., a single `plugin_loader.py` at
+    repo root) doesn't auto-exempt every directory.
+
+    First documented: 2026-04-26 monorepo-audit run on WRG, where 22 of
+    34 orphan_modules findings (52%) were `research_motor/cli/handlers/*`,
+    all dispatched by their parent `cli/registry.py` (a same-level
+    sibling at `directory.parent / registry.py`).
+    """
+    if not directory.is_dir():
+        return False
+    candidates: list[Path] = []
+    # 1. Files directly in the parent dir (sibling of `directory`)
+    candidates.extend(p for p in directory.parent.glob("*.py"))
+    # 2. The directory's own __init__.py (parent module loading children)
+    init = directory / "__init__.py"
+    if init.is_file():
+        candidates.append(init)
+    for candidate in candidates:
+        try:
+            text = candidate.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        if all(marker in text for marker in _DYNAMIC_DISPATCH_MARKERS):
+            return True
+    return False
+
+
+def _is_test_only_consumer(py: Path, mod: str, app_path: Path) -> bool:
+    """§6.2: True if at least one `tests/test_*.py` actually imports this module.
+
+    Daemon/worker modules with only sibling `tests/test_*.py` consumers
+    look like orphans to the static pkg graph (which doesn't scan tests/),
+    but they're entrypoints — the test is verifying the entrypoint
+    contract. We've already established there are no pkg-graph consumers
+    by the time this runs; if a test really imports the module, it's
+    not dead.
+
+    Match logic: parse each `tests/test_*.py` AST and look at actual
+    import nodes. A leaf substring would over-match (a string literal,
+    variable name, or docstring containing the leaf would falsely
+    exempt a genuinely orphan adapter).
+
+    Match: import target equals `mod`, OR equals the leaf name from a
+    `from <pkg> import <leaf>` where `<pkg>` is a prefix of `mod`.
+    """
+    tests_dir = app_path / "tests"
+    if not tests_dir.is_dir():
+        return False
+    leaf = mod.rsplit(".", 1)[-1]
+    parent_pkg = mod.rsplit(".", 1)[0] if "." in mod else ""
+    for test_py in tests_dir.rglob("test_*.py"):
+        try:
+            tree = ast.parse(test_py.read_text(encoding="utf-8", errors="ignore"))
+        except (OSError, SyntaxError):
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for n in node.names:
+                    if n.name == mod:
+                        return True
+            elif isinstance(node, ast.ImportFrom):
+                if node.module == mod:
+                    return True
+                # `from <parent_pkg> import <leaf>` matches when <parent_pkg>
+                # is a true prefix of <mod> AND <leaf> appears in the import list
+                if node.module and parent_pkg and (
+                    node.module == parent_pkg
+                    or parent_pkg.startswith(node.module + ".")
+                ):
+                    if any(n.name == leaf for n in node.names):
+                        return True
+    return False
+
+
 def check_orphan_modules(apps: list[Path]) -> CheckResult:
     result = CheckResult(name="orphan_modules")
     for app_path in apps:
@@ -452,12 +635,25 @@ def check_orphan_modules(apps: list[Path]) -> CheckResult:
                 mod.endswith("." + imp) or mod == imp
                 for imp in all_imports
             )
-            if not referenced:
-                rel_display = py.relative_to(app_path)
-                result.findings.append(Finding(
-                    check="orphan_modules", app=app_name,
-                    detail=f"{rel_display} — no importers found",
-                ))
+            if referenced:
+                continue
+            # §6.1: dynamic dispatch — file in a dispatched directory
+            if _is_dynamic_dispatch_dir(py.parent):
+                continue
+            # §6.2: ASGI entrypoint
+            if _is_asgi_entrypoint(py):
+                continue
+            # §6.2: plugin.py entrypoint convention
+            if _is_plugin_entrypoint(py):
+                continue
+            # §6.2: test-only consumer (worker/daemon entrypoints)
+            if _is_test_only_consumer(py, mod, app_path):
+                continue
+            rel_display = py.relative_to(app_path)
+            result.findings.append(Finding(
+                check="orphan_modules", app=app_name,
+                detail=f"{rel_display} — no importers found",
+            ))
     return result
 
 
