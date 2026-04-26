@@ -27,6 +27,7 @@ listed without reproduction detail until public disclosure.
 | `modelcontextprotocol/servers` (`mcp-server-time@0.6.2`) — **lite scan** | 2026-04-26 | public | 0 Critical / 0 High / 0 Medium / 1 Low / 0 Info | [time-mcp-2026-04-26](../../docs/case-studies/time-mcp-2026-04-26.md) |
 | `modelcontextprotocol/servers` (github MCP) | in progress | Pending: github MCP (in progress) | — | TBD |
 | `modelcontextprotocol/servers` (git MCP, `mcp-server-git@0.6.2`) | 2026-04-26 | public — upstream PR open | 0 C / 0 H / 0 M / 2 L / 1 I | [`git-mcp-2026-04-26.md`](../../docs/case-studies/git-mcp-2026-04-26.md) |
+| `modelcontextprotocol/servers` (memory MCP, `@modelcontextprotocol/server-memory@0.6.3`) | 2026-04-26 | public — upstream PR open | 0 C / 0 H / 0 M / 2 L / 1 I | [`memory-mcp-2026-04-26.md`](../../docs/case-studies/memory-mcp-2026-04-26.md) |
 
 When an audit lands, the row's "Case-study" column links to the document
 under [`docs/case-studies/`](../../docs/case-studies/). Internal audits
