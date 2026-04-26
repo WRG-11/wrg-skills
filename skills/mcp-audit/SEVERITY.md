@@ -67,6 +67,10 @@ context with the maintainer).
 | 31 | `SEC-008` | Security | Missing rate limit on resource-heavy tool (large fetch, expensive compute) | Medium | DoS vector; not direct compromise | Tool runs full repo scan on every call with no throttle |
 | 32 | `SEC-009` | Security | Verbose error leaks system info (versions, paths, internal hostnames) | Medium | Reconnaissance aid; lower than ERR-003 because not exception-driven | Tool returns `{"server_version": "...", "host": "...", "data_dir": "..."}` on every call |
 | 33 | `SHAPE-005` | Return-shape | Tool handler return cast (`as unknown as CallToolResult` in TS, `cast()` in Python) bypassing `outputSchema` typecheck | Low | Type system flagged a real shape mismatch and the handler bypassed it instead of fixing the return — strong corroboration signal for SHAPE-001 deviations and concrete evidence beats schema-in-isolation review | `read_media_file` returns `structuredContent.content: [{type, data, mimeType}, ...]` while `outputSchema` declares the field as `z.string()`; mismatch silenced via `return result as unknown as CallToolResult` at the handler boundary |
+| 34 | `STATE-001` | State handling | Mutating tool writes state without atomic primitives (no write-temp + rename, no transaction) | Medium | Crash mid-write leaves half-written state on disk; torn reads possible for concurrent readers; recovery requires manual intervention | `saveGraph` in `mcp-server-memory@0.6.x` writes JSONL via direct `fs.writeFile`, not `fs.rename`-from-temp; SIGKILL during the write leaves a truncated file that the next `loadGraph` parses as silent data loss |
+| 35 | `STATE-002` | State handling | Missing in-process serialiser (mutex / async-lock) for `load → mutate → save` pattern across concurrent tool calls | Medium | Two parallel mutation calls can interleave; second's load races first's save = lost write; no error surfaces, the loser's data is silently dropped | Two concurrent `create_entities` calls on `mcp-server-memory` both `loadGraph` before either `saveGraph`; whichever saves second wins and the first's entities are lost |
+| 36 | `STATE-003` | State handling | State persistence not exercised by tests (mutations visible within fixture, but no restart verification) | Low | Refactor to a different storage backend may silently break persistence; failure surfaces only in production after a process restart | All `mcp-server-memory` tests are within-fixture; no test re-instantiates the server and asserts that previously-created entities still appear after a fresh `loadGraph` |
+| 37 | `STATE-004` | State handling | Tool A's mutations observable by tool B in ways the surface doesn't document (state leakage) | Medium | Multi-tenant or multi-context deployments leak data across logical boundaries; not directly exploitable but trust-degrading; escalates to High if leakage crosses authentication boundaries | Hypothetical placeholder — no audited surface has surfaced this yet (the reference servers audited so far are all single-tenant). Will be filled with a concrete example on first occurrence |
 
 ---
 
@@ -84,6 +88,16 @@ case-study's "Why this bucket" line with `OVERRIDE:` and one of:
   tool is behind a documented `dev-mode` flag and the package README
   explicitly warns against production use.
 
+`STATE-001` and `STATE-002` may de-escalate to Low under the
+`disclosure-sop.md` "Medium severity where the disclosure IS the patch"
+edge case when the fix is a small public PR (e.g., a write-temp +
+`fs.rename` patch that the maintainer can review on its own with no
+proof-of-concept exploit needed). First applied: `mcp-server-memory`
+audit's atomic-write fix routed as Low + public PR via this path.
+
+`STATE-004` is Medium by default but escalates to High if the leakage
+crosses authentication or tenant boundaries.
+
 Do not de-escalate `SEC-001`, `SEC-002`, or `SEC-003` (the three
 Criticals). Those buckets are floors, not defaults.
 
@@ -96,6 +110,6 @@ row, propose a new row in the case-study's §6 ("Reusable patterns") and
 open a follow-up PR against this file. Keep `finding_id` zero-padded and
 contiguous within its category prefix.
 
-The 33-row count is not sacred — the table is expected to grow as more
+The 37-row count is not sacred — the table is expected to grow as more
 external audits land. The constraint is that every finding in every
 case-study cites a row by `finding_id`, so coverage must precede usage.
