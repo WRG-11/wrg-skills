@@ -19,7 +19,6 @@ from __future__ import annotations
 import argparse
 import ast
 import json
-import os
 import re
 import sqlite3
 import sys
@@ -30,7 +29,7 @@ if hasattr(sys.stdout, "reconfigure"):
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     except (AttributeError, OSError):
-        pass
+        pass  # reconfigure not supported on this platform — safe to ignore
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
 from pathlib import Path
