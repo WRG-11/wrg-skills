@@ -1,17 +1,17 @@
 # wrg-skills
 
-> Claude Code skills authored alongside the [WinstonRedGuard](https://github.com/yakuphanycl/WinstonRedGuard)
+> Claude Code skills authored alongside the WinstonRedGuard
 > monorepo. Five self-contained skills loaded on-demand from `~/.claude/skills/` —
 > the headline one (`mcp-audit`) ships with a validated framework, an external
 > disclosure SOP, and a public track record of five real-world audits.
 
-[![lint](https://github.com/yakuphanycl/wrg-skills/actions/workflows/lint.yml/badge.svg)](https://github.com/yakuphanycl/wrg-skills/actions/workflows/lint.yml)
+[![lint](https://github.com/WRG-11/wrg-skills/actions/workflows/lint.yml/badge.svg)](https://github.com/WRG-11/wrg-skills/actions/workflows/lint.yml)
 &nbsp;&nbsp;**5 external MCP audits** · **3 ecosystems** (TS / FastMCP-Py / low-level Py) · **0 GHSA filed** (by design — see disclosure SOP)
 
 ## Install
 
 ```bash
-npx skills install github.com/yakuphanycl/wrg-skills
+npx skills install github.com/WRG-11/wrg-skills
 claude
 /skills
 ```
@@ -165,7 +165,7 @@ proved useful in day-to-day WRG work.
 | [`monorepo-audit`](skills/monorepo-audit/) | "audit my monorepo", "schema drift", "fail_under check", "orphan modules" | Three static checks across a Python monorepo: SQLite schema drift, coverage-floor drift, orphan modules. Markdown + JSON report, exit code 0/1. Read-only. |
 | [`memory-check`](skills/memory-check/) | `/memory-check`, "what have I been correcting", "scan for friction patterns" | Pause-and-audit pass over the current conversation — surfaces correction patterns, repeated friction, real-time mismatches as candidate `feedback` memory entries with per-entry user approval. |
 | [`wrg-devguard-paste-lint`](skills/wrg-devguard-paste-lint/) | "is this prompt safe?", "any secrets in this?", "lint this prompt" | Runs [`wrg-devguard`](https://pypi.org/project/wrg-devguard/) policy lint or secret scan against a pasted snippet. Returns structured findings (rule_id, severity, position). Useful for prompt-injection detection and credential leak review. |
-| [`instinct`](skills/instinct/) — *mirror* | "remember this pattern", "log this fix", "what have we seen before", "/instinct" | Self-learning memory for AI coding agents (tool sequences, preferences, recurring fixes). Auto-promotes mature patterns into suggestions. **Mirrored from [yakuphanycl/instinct](https://github.com/yakuphanycl/instinct) v1.4.0**; runs on top of the [`instinct-mcp`](https://pypi.org/project/instinct-mcp/) PyPI server. |
+| [`instinct`](skills/instinct/) — *mirror* | "remember this pattern", "log this fix", "what have we seen before", "/instinct" | Self-learning memory for AI coding agents (tool sequences, preferences, recurring fixes). Auto-promotes mature patterns into suggestions. **Mirrored from [WRG-11/instinct](https://github.com/WRG-11/instinct) v1.4.0**; runs on top of the [`instinct-mcp`](https://pypi.org/project/instinct-mcp/) PyPI server. |
 
 ### Mirror drift detection
 
