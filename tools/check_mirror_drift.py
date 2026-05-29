@@ -25,6 +25,7 @@ import hashlib
 import json
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 from typing import Any
@@ -35,9 +36,10 @@ SKILLS_JSON = REPO_ROOT / "skills.json"
 
 def _github_blob_to_raw(blob_url: str) -> str:
     """Convert a github.com/<o>/<r>/blob/<branch>/<path> URL to raw.githubusercontent.com."""
-    if "raw.githubusercontent.com" in blob_url:
+    parsed = urllib.parse.urlparse(blob_url)
+    if parsed.netloc == "raw.githubusercontent.com":
         return blob_url
-    if "github.com" not in blob_url or "/blob/" not in blob_url:
+    if parsed.netloc != "github.com" or "/blob/" not in parsed.path:
         raise ValueError(f"Unrecognized URL shape (need github.com .../blob/...): {blob_url}")
     return blob_url.replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/")
 
