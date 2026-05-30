@@ -1,6 +1,6 @@
 ---
 name: mcp-audit
-description: Audit a FastMCP server for tool discoverability, return-shape consistency, test coverage, and decay candidates. Produces a structured evidence-only report with a "this-week pick" of named ≤1hr fixes plus a deferred next-session backlog. Use this skill when the user asks to "audit my MCP server", "score my MCP tools", "check tool discoverability", "MCP tool inventory", "are my MCP descriptions any good", or invokes `/mcp-audit`. Also use proactively when reviewing a FastMCP project that has grown past ~10 tools and the maintainer is unsure which deserve attention. Output is a Markdown report (single file under `docs/audit/` or `docs/decisions/`) with 6 sections: inventory, discoverability scoring (1-5 per tool), consistency audit (return shape + naming + error handling), decay candidates, top 5 priorities, decision gate. Read-only — proposes fixes, does not apply them. Battle-tested across two MCP servers (yakuphanycl/WinstonRedGuard PR #295, yakuphanycl/instinct PR #26).
+description: Audit a FastMCP server for tool discoverability, return-shape consistency, test coverage, and decay candidates. Produces a structured evidence-only report with a "this-week pick" of named ≤1hr fixes plus a deferred next-session backlog. Use this skill when the user asks to "audit my MCP server", "score my MCP tools", "check tool discoverability", "MCP tool inventory", "are my MCP descriptions any good", or invokes `/mcp-audit`. Also use proactively when reviewing a FastMCP project that has grown past ~10 tools and the maintainer is unsure which deserve attention. Output is a Markdown report (single file under `docs/audit/` or `docs/decisions/`) with 6 sections: inventory, discoverability scoring (1-5 per tool), consistency audit (return shape + naming + error handling), decay candidates, top 5 priorities, decision gate. Read-only — proposes fixes, does not apply them. Battle-tested across two MCP servers (WRG-11/wrg-mcp-server#295, WRG-11/instinct#26).
 ---
 
 # mcp-audit
@@ -318,11 +318,11 @@ Four discipline rules:
 
 Two real audits using this skill (or its precursor):
 
-- [`yakuphanycl/WinstonRedGuard#295`](https://github.com/yakuphanycl/WinstonRedGuard/pull/295) — wrg_mcp_server audit (32 tools, avg 2.81/5, 88% return-shape consistency, 4 decay candidates flagged for soft-deprecate)
-- [`yakuphanycl/instinct#26`](https://github.com/yakuphanycl/instinct/pull/26) — instinct audit (22 tools + 2 prompts, avg 4.91/5, 0/22 `ok` envelope, 0/22 MCP-layer test coverage, NONE decay)
+- [`WRG-11/wrg-mcp-server#295`](https://github.com/WRG-11/wrg-mcp-server/pull/295) — wrg_mcp_server audit (32 tools, avg 2.81/5, 88% return-shape consistency, 4 decay candidates flagged for soft-deprecate)
+- [`WRG-11/instinct#26`](https://github.com/WRG-11/instinct/pull/26) — instinct audit (22 tools + 2 prompts, avg 4.91/5, 0/22 `ok` envelope, 0/22 MCP-layer test coverage, NONE decay)
 
 Both audits produced ≤1hr "this-week pick" PRs that landed within hours.
-First audit's quick wins: [WRG#296](https://github.com/yakuphanycl/WinstonRedGuard/pull/296). Second audit's quick wins: [instinct#27](https://github.com/yakuphanycl/instinct/pull/27).
+First audit's quick wins: [WRG#296](https://github.com/WRG-11/wrg-mcp-server/pull/296). Second audit's quick wins: [instinct#27](https://github.com/WRG-11/instinct/pull/27).
 
 ## What this skill is NOT
 

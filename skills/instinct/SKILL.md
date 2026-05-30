@@ -3,7 +3,7 @@ name: instinct
 description: Self-learning pattern memory for AI coding agents. Record tool sequences, user preferences, and recurring fixes; let mature patterns auto-promote into rules that guide future sessions. Use when the user says "remember this pattern", "log this fix", "what have we seen before in this repo", "consolidate session memory", "tidy up memory", "what patterns have you learned", "show me instinct stats", or invokes "/instinct". Also trigger proactively when you notice you are repeating a fix, applying the same sequence a third time, or when the user corrects the same behavior twice. Do NOT use for per-session-only scratch notes (use regular memory), clipboard/paste operations, chat history search (that's conversation context), or when the user asks about Mem0 or claude-mem (those are different products). What makes instinct different: frequency-driven confidence (not LLM judgment), maturity tiers (raw/mature/rule/universal), automatic chain detection from timing, cross-project promotion, and multi-platform export.
 ---
 
-> **Mirrored skill** — canonical source: [yakuphanycl/instinct@v1.4.0+](https://github.com/yakuphanycl/instinct/blob/master/.claude/skills/instinct/SKILL.md). This copy in `wrg-skills` exists for cross-discovery; for upstream changes, watch the [`instinct`](https://github.com/yakuphanycl/instinct) repo. Last sync: 2026-04-25 (post-merge of upstream PR #24).
+> **Mirrored skill** — canonical source: [WRG-11/instinct@v1.4.1+](https://github.com/WRG-11/instinct/blob/master/.claude/skills/instinct/SKILL.md). This copy in `wrg-skills` exists for cross-discovery; for upstream changes, watch the [`instinct`](https://github.com/WRG-11/instinct) repo. Last sync: 2026-04-25 (post-merge of upstream PR #24).
 
 # instinct skill
 
@@ -157,7 +157,7 @@ Or in any MCP-compatible client's config:
 
 **Sync note for `wrg-skills` maintainers**: this is a mirror, not a fork. To
 pick up upstream improvements, re-copy from
-`yakuphanycl/instinct/.claude/skills/instinct/SKILL.md` and bump the "Last
+`WRG-11/instinct/.claude/skills/instinct/SKILL.md` and bump the "Last
 sync" date in the provenance line above. Drift detection should eventually
 land as a CI step that hashes the upstream file and compares; until then,
 manual sync on a quarterly cadence (or when upstream releases new minor /

@@ -184,6 +184,6 @@ Verdict: FAIL (1 finding) — DO NOT share this snippet further.
 
 ## Related
 
-- Web demo source: [`apps/wrg_devguard_demo`](https://github.com/yakuphanycl/WinstonRedGuard/tree/main/apps/wrg_devguard_demo)
+- Web demo source: `apps/wrg_devguard_demo` (WinstonRedGuard monorepo)
 - Core package: [`wrg-devguard` on PyPI](https://pypi.org/project/wrg-devguard/)
-- Source: [`apps/wrg_devguard`](https://github.com/yakuphanycl/WinstonRedGuard/tree/main/apps/wrg_devguard) (also published as standalone repo at [yakuphanycl/wrg-devguard](https://github.com/yakuphanycl/wrg-devguard))
+- Source: [`WRG-11/wrg-devguard`](https://github.com/WRG-11/wrg-devguard) (standalone public repo)

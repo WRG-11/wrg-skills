@@ -149,6 +149,6 @@ For each tool, four signals: CHANGELOG mention? README mention? imported by any 
 
 ## References
 
-- Audit precedent: [`yakuphanycl/WinstonRedGuard#295`](https://github.com/yakuphanycl/WinstonRedGuard/pull/295) (wrg_mcp_server)
-- Audit precedent: [`yakuphanycl/instinct#26`](https://github.com/yakuphanycl/instinct/pull/26) (instinct)
-- Skill source: [`yakuphanycl/wrg-skills/skills/mcp-audit`](https://github.com/yakuphanycl/wrg-skills/tree/main/skills/mcp-audit)
+- Audit precedent: [`WRG-11/wrg-mcp-server#295`](https://github.com/WRG-11/wrg-mcp-server/pull/295) (wrg_mcp_server)
+- Audit precedent: [`WRG-11/instinct#26`](https://github.com/WRG-11/instinct/pull/26) (instinct)
+- Skill source: [`WRG-11/wrg-skills/skills/mcp-audit`](https://github.com/WRG-11/wrg-skills/tree/main/skills/mcp-audit)
