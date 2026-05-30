@@ -51,10 +51,6 @@ evidence record, and (where applicable) an upstream fix PR.
 Aggregate: **0 Critical, 0 High, 1 Medium, 12 Low, 6 Info** across 5 surfaces and
 ~50 tools. No GHSA filed because nothing warranted one.
 
-> Some case-study files are landing in PRs #9, #11, #12, #14, #15 — they appear in
-> `docs/case-studies/` after merge. Until then, the table reflects the planned final
-> state and the case-study links resolve once the corresponding PR lands.
-
 ### 3-ecosystem triangulation
 
 The skill was originally written against **FastMCP Python** (`@mcp.tool()`). To

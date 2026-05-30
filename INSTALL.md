@@ -8,7 +8,7 @@ agent CLIs that consume the [skills format](https://skills.sh).
 ## TL;DR
 
 ```bash
-npx skills install github.com/yakuphanycl/wrg-skills
+npx skills install github.com/WRG-11/wrg-skills
 ```
 
 The installer asks two questions that materially change behaviour:
@@ -75,7 +75,7 @@ installer doesn't currently target this path.
 ### Option 1 — manual copy
 
 ```bash
-git clone https://github.com/yakuphanycl/wrg-skills.git /tmp/wrg-skills
+git clone https://github.com/WRG-11/wrg-skills.git /tmp/wrg-skills
 cp -r /tmp/wrg-skills/skills/<name> ~/.claude/skills/<name>
 ```
 
@@ -85,7 +85,7 @@ trigger phrase matches.
 ### Option 2 — symlink (if you want updates to track the repo)
 
 ```bash
-git clone https://github.com/yakuphanycl/wrg-skills.git ~/code/wrg-skills
+git clone https://github.com/WRG-11/wrg-skills.git ~/code/wrg-skills
 ln -s ~/code/wrg-skills/skills/<name> ~/.claude/skills/<name>
 # Pull in ~/code/wrg-skills updates the live skill
 ```
@@ -95,7 +95,7 @@ ln -s ~/code/wrg-skills/skills/<name> ~/.claude/skills/<name>
 If your other agents and Claude Code agree on the skill name:
 
 ```bash
-npx skills install github.com/yakuphanycl/wrg-skills    # pick Global
+npx skills install github.com/WRG-11/wrg-skills    # pick Global
 ln -s ~/.agents/skills/<name> ~/.claude/skills/<name>
 ```
 

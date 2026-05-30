@@ -1,16 +1,16 @@
 {
   "$schema": "https://skills.sh/schema/skills.v1.json",
   "repository": {
-    "name": "yakuphanycl/wrg-skills",
-    "url": "https://github.com/yakuphanycl/wrg-skills",
+    "name": "WRG-11/wrg-skills",
+    "url": "https://github.com/WRG-11/wrg-skills",
     "license": "MIT",
-    "description": "Claude Code skills authored alongside the WinstonRedGuard monorepo: monorepo-audit, memory-check, wrg-devguard-paste-lint, instinct (mirrored from yakuphanycl/instinct), mcp-audit",
-    "homepage": "https://github.com/yakuphanycl/wrg-skills"
+    "description": "Claude Code skills authored alongside the WinstonRedGuard monorepo: monorepo-audit, memory-check, wrg-devguard-paste-lint, instinct (mirrored from WRG-11/instinct), mcp-audit",
+    "homepage": "https://github.com/WRG-11/wrg-skills"
   },
   "publisher": {
-    "name": "yakuphanycl",
-    "url": "https://github.com/yakuphanycl",
-    "context": "Author of the WinstonRedGuard monorepo (https://github.com/yakuphanycl/WinstonRedGuard); skills here are byproducts of that work."
+    "name": "WRG-11",
+    "url": "https://github.com/WRG-11",
+    "context": "WinstonRedGuard open-source AI/LLM security tooling (https://github.com/WRG-11); skills here are byproducts of that work."
   },
   "version": "0.1.0",
   "published_at": "2026-04-25",
@@ -108,7 +108,7 @@
     {
       "name": "instinct",
       "path": "skills/instinct",
-      "summary": "Self-learning memory for AI coding agents. Records tool sequences, user preferences, and recurring fixes; auto-promotes mature patterns into suggestions. Mirror of yakuphanycl/instinct's canonical skill — runs on top of the instinct-mcp PyPI server (~1,400 monthly downloads).",
+      "summary": "Self-learning memory for AI coding agents. Records tool sequences, user preferences, and recurring fixes; auto-promotes mature patterns into suggestions. Mirror of WRG-11/instinct's canonical skill — runs on top of the instinct-mcp PyPI server (~1,400 monthly downloads).",
       "tags": [
         "memory",
         "pattern-learning",
@@ -138,8 +138,8 @@
         ]
       },
       "mirror": {
-        "source": "https://github.com/yakuphanycl/instinct/blob/master/.claude/skills/instinct/SKILL.md",
-        "upstream_repo": "yakuphanycl/instinct",
+        "source": "https://github.com/WRG-11/instinct/blob/main/.claude/skills/instinct/SKILL.md",
+        "upstream_repo": "WRG-11/instinct",
         "upstream_version_at_sync": "v1.4.0",
         "last_sync": "2026-04-25",
         "sync_cadence": "manual / quarterly or on upstream minor release",
@@ -174,8 +174,8 @@
       "language": "markdown",
       "stability": "stable",
       "precedents": [
-        "https://github.com/yakuphanycl/WinstonRedGuard/pull/295",
-        "https://github.com/yakuphanycl/instinct/pull/26"
+        "https://github.com/WRG-11/wrg-mcp-server/pull/295",
+        "https://github.com/WRG-11/instinct/pull/26"
       ]
     }
   ],
@@ -189,7 +189,7 @@
   },
   "ecosystem": {
     "format": "skills.sh v1",
-    "installer": "npx skills install github.com/yakuphanycl/wrg-skills",
+    "installer": "npx skills install github.com/WRG-11/wrg-skills",
     "compatible_agents": [
       "Amp",
       "Antigravity",

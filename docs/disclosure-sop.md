@@ -233,7 +233,7 @@ Do not include the markdown comment lines.
 ## Reporter
 - Name / handle: <...>
 - Contact: <email>
-- Audit methodology: https://github.com/yakuphanycl/wrg-skills/blob/main/skills/mcp-audit/SKILL.md
+- Audit methodology: https://github.com/WRG-11/wrg-skills/blob/main/skills/mcp-audit/SKILL.md
 ```
 
 ### 3.2 Coordinated private disclosure (Medium)
@@ -242,7 +242,7 @@ Do not include the markdown comment lines.
 Hi <maintainer>,
 
 I ran an MCP audit against `<repo>@<sha>` using the `mcp-audit` skill at
-https://github.com/yakuphanycl/wrg-skills/tree/main/skills/mcp-audit and
+https://github.com/WRG-11/wrg-skills/tree/main/skills/mcp-audit and
 identified one Medium-severity finding I'd like to coordinate on before
 filing publicly.
 
@@ -252,7 +252,7 @@ filing publicly.
 **Why Medium**: <which row of skills/mcp-audit/SEVERITY.md applies>
 **Suggested fix**: <one paragraph or patch>
 
-Per https://github.com/yakuphanycl/wrg-skills/blob/main/docs/disclosure-sop.md,
+Per https://github.com/WRG-11/wrg-skills/blob/main/docs/disclosure-sop.md,
 Medium findings follow coordinated 90-day disclosure: I'll publish a public
 case-study on or before <YYYY-MM-DD + 90d> regardless of patch status. If you
 patch sooner, I'll publish on release with credit.
@@ -272,11 +272,11 @@ Thanks,
 ## Summary
 This issue/PR collects <N> <Low | Info>-severity findings produced by an MCP
 audit of `<repo>@<sha>`. Methodology:
-https://github.com/yakuphanycl/wrg-skills/blob/main/skills/mcp-audit/SKILL.md.
+https://github.com/WRG-11/wrg-skills/blob/main/skills/mcp-audit/SKILL.md.
 
 No security impact — these are consistency, documentation, and discoverability
 observations. Severity rubric:
-https://github.com/yakuphanycl/wrg-skills/blob/main/docs/disclosure-sop.md#1-severity-rubric.
+https://github.com/WRG-11/wrg-skills/blob/main/docs/disclosure-sop.md#1-severity-rubric.
 
 ## Findings
 
